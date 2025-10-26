@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admin - AOVTANMOD Shop</title>
+  <style>
+    body{font-family:Arial, sans-serif; margin:20px; background:#f7f7f7; color:#333}
+    .wrap{max-width:900px; margin:0 auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.1)}
+    table{width:100%; border-collapse:collapse; margin-top:10px}
+    th,td{padding:8px; border-bottom:1px solid #eaeaea; text-align:left}
+    th{background:#f0f0f0}
+    .btn{padding:6px 10px; border:none; border-radius:4px; cursor:pointer}
+    .danger{background:#dc3545;color:#fff}
+    .primary{background:#007bff;color:#fff}
+    .top{display:flex; justify-content:space-between; align-items:center}
+    .small{font-size:0.9em; color:#666}
+    input[type=password]{padding:6px; margin-right:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h2>Admin - AOVTANMOD Shop</h2>
+      <div class="small">Quản lý đơn hàng | Bảo vệ bằng mật khẩu</div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label>Nhập mật khẩu admin: </label>
+      <input type="password" id="pw" placeholder="admin password" value="admin123"/>
+      <button class="btn primary" onclick="auth()">Đăng nhập</button>
+      <button class="btn" onclick="downloadCSV()">Xuất CSV</button>
+      <button class="btn" onclick="refresh()">Tải lại</button>
+    </div>
+
+    <div id="content" style="margin-top:15px; display:none">
+      <table id="orders-table">
+        <thead><tr><th>ID</th><th>Khách</th><th>Số lượng</th><th>Tổng (đ)</th><th>Thời gian</th><th>Hành động</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_PASSWORD = 'admin123'; // change this locally if needed
+    function auth(){
+      const pw = document.getElementById('pw').value;
+      if(pw !== ADMIN_PASSWORD){
+        alert('Mật khẩu không đúng');
+        return;
+      }
+      document.getElementById('content').style.display = 'block';
+      loadOrders();
+    }
+
+    async function loadOrders(){
+      const res = await fetch('/api/orders');
+      const orders = await res.json();
+      const tbody = document.querySelector('#orders-table tbody');
+      if(!orders.length) {
+        tbody.innerHTML = '<tr><td colspan="6">Chưa có đơn hàng</td></tr>';
+        return;
+      }
+      tbody.innerHTML = orders.map(o => `<tr>
+        <td>${o.id}</td>
+        <td>${escapeHtml(o.name)}</td>
+        <td>${o.items.length}</td>
+        <td>${numberWithCommas(o.total)}</td>
+        <td>${escapeHtml(o.time)}</td>
+        <td><button class="btn danger" onclick="deleteOrder('${o.id}')">Xóa</button></td>
+      </tr>`).join('');
+    }
+
+    async function deleteOrder(id){
+      if(!confirm('Bạn chắc chắn muốn xóa đơn ' + id + '?')) return;
+      const res = await fetch('/api/orders/' + id, { method: 'DELETE' });
+      const j = await res.json();
+      if(j.success) {
+        alert('Đã xóa');
+        loadOrders();
+      } else alert('Lỗi: ' + (j.error || ''));
+    }
+
+    async function downloadCSV(){
+      const res = await fetch('/api/orders/csv');
+      if(res.status !== 200) { alert('Không thể xuất CSV'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'orders.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function refresh(){ loadOrders(); }
+    function numberWithCommas(x){ return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]; }); }
+  </script>
+</body>
+</html>
